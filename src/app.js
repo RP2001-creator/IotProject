@@ -25,6 +25,11 @@ app.post("/off", (req, res) => {
   broadcastState();
   res.json({ status: "Relay OFF" });
 });
+// ===== New route: Get current relay state =====
+app.get("/status", (req, res) => {
+  res.json({ relay: relayState ? "ON" : "OFF" });
+});
+
 
 // ===== Start HTTP server =====
 const server = app.listen(3000, () => {
