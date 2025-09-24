@@ -1,8 +1,3 @@
-import dotenv from "dotenv";
-import { app } from "./app.js";
+import { app } from "./app.js"; // Now works
 
-dotenv.config({ path: "./env" });
-
-app.listen(process.env.PORT || 3000, () => {
-  console.log(`Server is running on port: ${process.env.PORT || 3000}`);
-});
+// No need to start server again, it's already started in app.js
