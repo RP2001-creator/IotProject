@@ -2,7 +2,7 @@ import express from "express";
 import { WebSocketServer } from "ws";
 
 const app = express();
-
+app.use(cors());  
 // ===== Minimal middleware =====
 app.use(express.json());
 
