@@ -55,11 +55,12 @@ connectDB()
     let usage = await RelayUsage.findOne({ relayId: "relay1" });
     if (!usage) {
       usage = new RelayUsage({
-        relayId: "relay1",
-        powerW: 3,       // 3W bulb as per your image
-        voltage: 230,    
-        unitPrice: 9,     // Surat electricity price in ₹/kWh
-      });
+      relayId: "relay1",
+      powerW: 3,       // 3W bulb
+      voltage: 230,    
+      unitPrice: 4.15, // Average Surat electricity price in ₹/kWh for 101–250 units
+    });
+
       await usage.save();
     }
 
