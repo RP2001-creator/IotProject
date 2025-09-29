@@ -14,8 +14,41 @@ app.use(express.json());
 
 // ===== Relay state =====
 let relayState = false;
+let wss; // WebSocketServer reference
 
-// ===== Connect to MongoDB =====
+// ===== Helper function to broadcast relay state =====
+function broadcastState() {
+  if (!wss) return;
+  const payload = JSON.stringify({ relay: relayState });
+  wss.clients.forEach((client) => {
+    if (client.readyState === client.OPEN) client.send(payload);
+  });
+}
+
+// ===== Helper functions for relay =====
+async function turnRelayOn() {
+  relayState = true;
+  broadcastState();
+  const usage = await RelayUsage.findOne({ relayId: "relay1" });
+  if (!usage.lastStartTime) {
+    usage.lastStartTime = new Date();
+    await usage.save();
+  }
+}
+
+async function turnRelayOff() {
+  relayState = false;
+  broadcastState();
+  const usage = await RelayUsage.findOne({ relayId: "relay1" });
+  if (usage.lastStartTime) {
+    const durationSec = (new Date() - usage.lastStartTime) / 1000;
+    usage.totalSeconds += durationSec;
+    usage.lastStartTime = null;
+    await usage.save();
+  }
+}
+
+// ===== Connect to MongoDB and start server =====
 connectDB()
   .then(async () => {
     // Ensure a usage document exists
@@ -23,19 +56,19 @@ connectDB()
     if (!usage) {
       usage = new RelayUsage({
         relayId: "relay1",
-        powerW: 60,       // default bulb power
-        voltage: 230,     // default voltage
-        unitPrice: 9,     // default Surat unit price in ₹
+        powerW: 3,       // 3W bulb as per your image
+        voltage: 230,    
+        unitPrice: 9,     // Surat electricity price in ₹/kWh
       });
       await usage.save();
     }
 
-    const server = app.listen(process.env.PORT, () => {
-      console.log(`Server running on port: ${process.env.PORT}`);
+    const server = app.listen(process.env.PORT || 3000, () => {
+      console.log(`Server running on port: ${process.env.PORT || 3000}`);
     });
 
     // ===== WebSocket setup =====
-    const wss = new WebSocketServer({ server });
+    wss = new WebSocketServer({ server });
 
     wss.on("connection", (ws) => {
       console.log("New client connected");
@@ -50,9 +83,6 @@ connectDB()
           const data = JSON.parse(message.toString());
           if (data.command === "on") await turnRelayOn();
           if (data.command === "off") await turnRelayOff();
-
-          // Broadcast updated state
-          broadcastState();
         } catch (err) {
           console.log("Invalid message format");
         }
@@ -60,13 +90,6 @@ connectDB()
 
       ws.on("close", () => console.log("Client disconnected"));
     });
-
-    function broadcastState() {
-      const payload = JSON.stringify({ relay: relayState });
-      wss.clients.forEach((client) => {
-        if (client.readyState === client.OPEN) client.send(payload);
-      });
-    }
 
   })
   .catch((err) => console.log("MongoDB connection failed!", err));
@@ -93,7 +116,6 @@ app.get("/usage", async (req, res) => {
   const usage = await RelayUsage.findOne({ relayId: "relay1" });
   if (!usage) return res.json({ energyKWh: 0, cost: 0 });
 
-  // If relay is ON, add ongoing duration
   let totalSec = usage.totalSeconds;
   if (usage.lastStartTime) {
     totalSec += (new Date() - usage.lastStartTime) / 1000;
@@ -108,28 +130,5 @@ app.get("/usage", async (req, res) => {
     totalSeconds: Math.floor(totalSec),
   });
 });
-
-// ===== Helper functions =====
-async function turnRelayOn() {
-  relayState = true;
-  broadcastState();
-  const usage = await RelayUsage.findOne({ relayId: "relay1" });
-  if (!usage.lastStartTime) {
-    usage.lastStartTime = new Date();
-    await usage.save();
-  }
-}
-
-async function turnRelayOff() {
-  relayState = false;
-  broadcastState();
-  const usage = await RelayUsage.findOne({ relayId: "relay1" });
-  if (usage.lastStartTime) {
-    const durationSec = (new Date() - usage.lastStartTime) / 1000;
-    usage.totalSeconds += durationSec;
-    usage.lastStartTime = null;
-    await usage.save();
-  }
-}
 
 export { app };
